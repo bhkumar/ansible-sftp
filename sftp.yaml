@@ -10,12 +10,12 @@
       product1:
         volume_size: '5'
         device_name: '/dev/xvdb'
-        mount_path: /mnt/product1
+        mount_path: /sftp/product1
         password: $1$QA6ZbA4E$28/p4/dKXy3OVOy8Gz5lm0  #generate new passwd using "openssl passwd -1"
       product2:
         volume_size: '4'
         device_name: '/dev/xvdc'
-        mount_path: /mnt/product2
+        mount_path: /sftp/product2
         password: $1$CAyxPC54$2fb6i0ebiEb74slWhAHcc.  #generate new passwd using "openssl passwd -1"
   environment:
     AWS_ACCESS_KEY_ID: "{{ aws_access_key }}"
