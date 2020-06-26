@@ -1,0 +1,89 @@
+---
+- hosts: localhost
+  become: yes
+  become_user: root
+  vars:
+    aws_access_key: '' #Enter aws access key
+    aws_secret_key: '' #Enter aws secret key
+    instance_id: ''    #Enter instance id
+    tech:
+      product1:
+        volume_size: '5'
+        device_name: '/dev/xvdb'
+        mount_path: /mnt/product1
+        password: $1$QA6ZbA4E$28/p4/dKXy3OVOy8Gz5lm0  #generate new passwd using "openssl passwd -1"
+      product2:
+        volume_size: '4'
+        device_name: '/dev/xvdc'
+        mount_path: /mnt/product2
+        password: $1$CAyxPC54$2fb6i0ebiEb74slWhAHcc.  #generate new passwd using "openssl passwd -1"
+  environment:
+    AWS_ACCESS_KEY_ID: "{{ aws_access_key }}"
+    AWS_SECRET_ACCESS_KEY: "{{ aws_secret_key }}"
+    AWS_REGION: "ap-south-1"
+  handlers:
+  - name: SFTP-Server | Restart sshd
+    service:
+      name: "{{ 'ssh' if ansible_os_family == 'Debian' else 'sshd' }}"
+      state: restarted
+  ignore_errors: Yes
+  tasks:
+  - name: Create a directory if it does not exist
+    file:
+      path: "{{ item.value.mount_path }}"
+      state: directory
+      mode: '0755'
+    loop: "{{ lookup('dict', tech)}}"
+  - name: create ebs volume
+    ec2_vol:
+      instance: "{{ instance_id }}"
+      volume_size: "{{ item.value.volume_size }}"
+      device_name: "{{ item.value.device_name }}"
+    loop: "{{ lookup('dict', tech)}}"
+    register: volume
+  - parted:
+      device: "{{ item.value.device_name }}"
+      number: 1
+      state: present
+    loop: "{{ lookup('dict', tech)}}"
+  - filesystem:
+      fstype: ext4
+      dev: "{{ item.value.device_name }}1"
+    loop: "{{ lookup('dict', tech)}}"
+  - mount:
+      boot: yes
+      path: "{{ item.value.mount_path }}"
+      src: "{{ item.value.device_name }}1"
+      fstype: ext4
+      state: mounted
+    loop: "{{ lookup('dict', tech)}}"
+  - name: SFTP-Server | Alter sftp subsystem entry
+    lineinfile:
+      dest: /etc/ssh/sshd_config
+      regexp: '^Subsystem(\s+)sftp'
+      line: "Subsystem sftp internal-sftp"
+      state: present
+    notify: SFTP-Server | Restart sshd
+  - name: User sftp users
+    user:
+      name: "{{ item.key }}"
+      password: "{{ item.value.password }}"
+      shell: /bin/false
+      home: "{{ item.value.mount_path }}"
+      append: yes
+    loop: "{{ lookup('dict', tech)}}"
+  - name: Change permissions of mount point
+    shell: |
+        chown "{{ item.key }}" "{{ item.value.mount_path }}"
+    loop: "{{ lookup('dict', tech)}}"
+  - name: Insert/Update /etc/ssh/sshd_config file
+    blockinfile:
+      path: /etc/ssh/sshd_config
+      block: |
+        Match User "{{ item.key }}"
+          ChrootDirectory "{{ item.value.mount_path }}"
+          ForceCommand internal-sftp
+          AllowTCPForwarding no
+          X11Forwarding no
+      marker: ""
+    loop: "{{ lookup('dict', tech)}}"
