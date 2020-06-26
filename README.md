@@ -17,3 +17,12 @@ https://help.ubuntu.com/community/SSH/OpenSSH/Configuring#:~:text=LogLevel%20VER
 
 #### Create hash password using openssl
 https://ma.ttias.be/how-to-generate-a-passwd-password-hash-via-the-command-line-on-linux/
+
+#### RUN
+> ansible-playbook ssh_config.yaml
+> ansible-playbook sftp.yaml
+
+
+#### Provide a folder access to use
+> Create sub-directory in chroot directory
+> Make sure 755 permission /sftp bcz `/sftp/product1` and `/sftp/product2` will accessed by sftp users.
